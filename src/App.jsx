@@ -46,10 +46,18 @@ export default function App() {
   const [firebaseConfig, setFirebaseConfig] = useState(() => {
     try {
       const saved = localStorage.getItem('aura_firebase_config');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    
+    // Default fallback to your live Google Firebase database config
+    return {
+      apiKey: "AIzaSyD0eOiNAFeogiDpNtWY_gpStfKTmRra-N4",
+      authDomain: "coco-chat-e2957.firebaseapp.com",
+      projectId: "coco-chat-e2957",
+      storageBucket: "coco-chat-e2957.firebasestorage.app",
+      messagingSenderId: "1079400843621",
+      appId: "1:1079400843621:web:a7891609691567ed84798c"
+    };
   });
 
   const [service, setService] = useState(null);
