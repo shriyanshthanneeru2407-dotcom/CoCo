@@ -1,5 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { User, Settings, Database, ArrowRight, AtSign, UploadCloud } from 'lucide-react';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
 // Custom Logo Icon (Option 3: Interlocked Cs with blue double-ring central link, styled with contrast container)
 const LogoIcon = ({ size = 28, style }) => (
   <div style={{
@@ -75,6 +78,59 @@ export default function AuthModal({ onLogin, savedConfig, onSaveConfig }) {
   const [storageBucket, setStorageBucket] = useState(savedConfig?.storageBucket || '');
   const [messagingSenderId, setMessagingSenderId] = useState(savedConfig?.messagingSenderId || '');
   const [appId, setAppId] = useState(savedConfig?.appId || '');
+
+  const handleGoogleLogin = async () => {
+    if (!savedConfig || !savedConfig.apiKey) {
+      alert('Google Sign-In requires an active Firebase configuration. Please configure Firebase first using the button below!');
+      return;
+    }
+
+    try {
+      // Initialize Firebase App if not already done
+      const app = getApps().length === 0 ? initializeApp(savedConfig) : getApp();
+      const auth = getAuth(app);
+      const db = getFirestore(app);
+
+      const provider = new GoogleAuthProvider();
+      // Enable account selector prompt
+      provider.setCustomParameters({ prompt: 'select_account' });
+
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      const uid = user.uid;
+      const fullName = user.displayName || 'Google User';
+      const avatar = user.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(fullName)}`;
+      const email = user.email || '';
+      const defaultUsername = email ? email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '') : 'user_' + uid.substring(0, 8);
+
+      // Fetch existing user presence profile if it exists (so we preserve friends and username!)
+      let finalUsername = defaultUsername;
+      let friends = [];
+      try {
+        const docRef = doc(db, 'presence', uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.username) finalUsername = data.username;
+          if (data.friends) friends = data.friends;
+        }
+      } catch (err) {
+        console.warn("Could not fetch existing profile (might be offline):", err);
+      }
+
+      onLogin({
+        id: uid,
+        fullName,
+        username: finalUsername,
+        avatar,
+        friends
+      });
+    } catch (error) {
+      console.error("Google Sign-In Error:", error);
+      alert(`Google Sign-In failed: ${error.message}`);
+    }
+  };
 
   // Compressor utility
   const processFile = (file) => {
@@ -262,6 +318,42 @@ export default function AuthModal({ onLogin, savedConfig, onSaveConfig }) {
                 Join Chat Stream <ArrowRight size={18} />
               </button>
             </form>
+
+            <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', gap: '10px' }}>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }}></div>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: '600' }}>OR</span>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }}></div>
+            </div>
+
+            <button 
+              type="button" 
+              className="secondary-btn" 
+              onClick={handleGoogleLogin}
+              style={{ 
+                width: '100%', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                gap: '10px',
+                height: '46px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: '0.95rem',
+                fontWeight: '600',
+                border: '1px solid var(--border-glass)',
+                background: 'var(--bg-glass)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)'
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" style={{ flexShrink: 0 }}>
+                <path fill="#4285F4" d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.47h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.91c1.7-1.57 2.69-3.88 2.69-6.6z"/>
+                <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.2l-2.91-2.26a5.71 5.71 0 0 1-8.52-3.04H.51v2.33A9 9 0 0 0 9 18z"/>
+                <path fill="#FBBC05" d="M3.53 10.5a5.41 5.41 0 0 1 0-3.47V4.7H.51a9 9 0 0 0 0 8.6l3.02-2.3z"/>
+                <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35L15 2.4A9 9 0 0 0 .51 4.7l3.02 2.33A5.71 5.71 0 0 1 9 3.58z"/>
+              </svg>
+              Sign in with Google
+            </button>
 
             <div style={{ textAlign: 'center', marginTop: '20px' }}>
               <button
