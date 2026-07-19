@@ -92,7 +92,8 @@ export default function Sidebar({
   onUpdateProfile,
   isCollapsed,
   onToggleCollapse,
-  typingUsers
+  typingUsers,
+  onToggleFriend
 }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [addType, setAddType] = useState('server'); // 'server' | 'group' | 'collab'
@@ -104,6 +105,12 @@ export default function Sidebar({
   const [editFullName, setEditFullName] = useState(currentUser.fullName);
   const [editAvatar, setEditAvatar] = useState(currentUser.avatar);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Add friend state
+  const [showAddFriendModal, setShowAddFriendModal] = useState(false);
+  const [friendUsername, setFriendUsername] = useState('');
+  const [friendError, setFriendError] = useState('');
+  const [friendSuccess, setFriendSuccess] = useState('');
   
   const fileInputRef = useRef(null);
 
@@ -112,8 +119,60 @@ export default function Sidebar({
   const groups = rooms.filter(r => r.type === 'group');
   const collabs = rooms.filter(r => r.type === 'collab');
 
-  // Filter presence users: find active ones and render as DMs
-  const activeUsers = Object.values(presence).filter(u => u.id !== currentUser.id && u.status !== 'offline');
+  // Filter presence users: show online users OR those in friend list (even if offline)
+  const activeUsers = Object.values(presence).filter(u => {
+    const isMe = u.id === currentUser.id;
+    const isFriendUser = currentUser.friends?.includes(u.id);
+    const isOnline = u.status !== 'offline';
+    return !isMe && (isOnline || isFriendUser);
+  });
+
+  const handleAddFriend = async (e) => {
+    e.preventDefault();
+    setFriendError('');
+    setFriendSuccess('');
+
+    const targetUsername = friendUsername.trim().replace(/^@/, '');
+    if (!targetUsername) {
+      setFriendError('Please enter a username.');
+      return;
+    }
+
+    if (targetUsername.toLowerCase() === currentUser.username?.toLowerCase()) {
+      setFriendError("You cannot add yourself as a friend!");
+      return;
+    }
+
+    // Search presence for user with this username (case-insensitive)
+    const foundUser = Object.values(presence).find(
+      u => u.username?.toLowerCase() === targetUsername.toLowerCase()
+    );
+
+    if (!foundUser) {
+      setFriendError(`User @${targetUsername} not found. Make sure they have logged in at least once!`);
+      return;
+    }
+
+    if (currentUser.friends?.includes(foundUser.id)) {
+      setFriendError(`@${targetUsername} is already your friend!`);
+      return;
+    }
+
+    try {
+      if (onToggleFriend) {
+        await onToggleFriend(foundUser.id);
+      }
+      setFriendSuccess(`Successfully added @${targetUsername} as a friend!`);
+      setFriendUsername('');
+      setTimeout(() => {
+        setShowAddFriendModal(false);
+        setFriendSuccess('');
+      }, 1500);
+    } catch (err) {
+      setFriendError('Failed to add friend. Try again.');
+      console.error(err);
+    }
+  };
 
   const handleCreateRoom = (e) => {
     e.preventDefault();
@@ -346,6 +405,9 @@ export default function Sidebar({
           <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <MessageSquare size={14} /> DM's
           </span>
+          <button className="add-room-btn" onClick={() => setShowAddFriendModal(true)} title="Add Friend by Username">
+            <Plus size={14} />
+          </button>
         </div>
         {activeUsers.length > 0 ? (
           activeUsers.map(user => {
@@ -619,6 +681,54 @@ export default function Sidebar({
                 </button>
                 <button type="submit" className="primary-btn">
                   Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Friend Modal Overlay */}
+      {showAddFriendModal && (
+        <div className="modal-overlay" style={{ zIndex: 120 }} onClick={() => setShowAddFriendModal(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h3 className="modal-title">Add Friend</h3>
+            <p className="modal-desc">Enter a username to add them to your DM list (even if they are offline).</p>
+            <form onSubmit={handleAddFriend}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="friend-username">Username</label>
+                <input 
+                  type="text" 
+                  id="friend-username"
+                  className="form-input" 
+                  placeholder="e.g. shriyansh" 
+                  value={friendUsername}
+                  onChange={(e) => setFriendUsername(e.target.value)}
+                  maxLength={25}
+                  required
+                  autoFocus
+                  autoComplete="off"
+                />
+              </div>
+
+              {friendError && (
+                <div style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '-8px', marginBottom: '12px' }}>
+                  {friendError}
+                </div>
+              )}
+
+              {friendSuccess && (
+                <div style={{ color: '#22c55e', fontSize: '0.8rem', marginTop: '-8px', marginBottom: '12px' }}>
+                  {friendSuccess}
+                </div>
+              )}
+
+              <div className="modal-actions">
+                <button type="button" className="secondary-btn" onClick={() => setShowAddFriendModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="primary-btn">
+                  Add Friend
                 </button>
               </div>
             </form>

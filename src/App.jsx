@@ -371,6 +371,7 @@ export default function App() {
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={setIsSidebarCollapsed}
           typingUsers={typingUsers}
+          onToggleFriend={handleToggleFriend}
         />
         
         {!isSidebarCollapsed && (

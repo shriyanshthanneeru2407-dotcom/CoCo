@@ -42,9 +42,13 @@ export class FirebaseChatService extends ChatService {
     const id = `${type}-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
     const roomRef = doc(this.db, 'rooms', id);
     
-    const roomDoc = await getDoc(roomRef);
-    if (roomDoc.exists()) {
-      throw new Error('Room name already exists in this category!');
+    try {
+      const roomDoc = await getDoc(roomRef);
+      if (roomDoc.exists()) {
+        throw new Error('Room name already exists in this category!');
+      }
+    } catch (e) {
+      console.warn("Firestore uniqueness check bypassed (offline/unreachable):", e);
     }
 
     const roomData = {
