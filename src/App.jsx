@@ -189,8 +189,12 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    if (service && currentUser) {
-      await service.updatePresence(currentUser, 'offline');
+    try {
+      if (service && currentUser) {
+        await service.updatePresence(currentUser, 'offline');
+      }
+    } catch (e) {
+      console.warn("Could not set user presence to offline during logout:", e);
     }
     setCurrentUser(null);
     setActiveRoom(null);
